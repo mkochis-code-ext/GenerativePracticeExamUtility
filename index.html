@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generative Practice Exam Utility</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Exam Selection Screen -->
+        <div id="selectionScreen" class="exam-selection">
+            <h1>Generative Practice Exam Utility</h1>
+            <h2>Generate an exam with AI</h2>
+            
+            <!-- Main Generate Exam Section -->
+            <div style="margin: 30px 0;">
+                <p style="color: #555; margin-bottom: 20px;">Use GitHub Copilot to generate custom exam questions on any topic:</p>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="topicInput">Exam Topic (optional):</label>
+                        <input type="text" class="topic-input" id="topicInput" placeholder="e.g., Azure Fundamentals, Python Programming..." oninput="updatePrompt()">
+                    </div>
+                    <div class="input-group">
+                        <label for="questionCountInput">Number of Questions:</label>
+                        <input type="number" class="topic-input" id="questionCountInput" placeholder="e.g., 10, 20, 50..." min="1" value="10" oninput="updatePrompt()">
+                    </div>
+                </div>
+                <div class="prompt-container">
+                    <div class="prompt-box" id="promptBox">
+                        <span id="promptText">Generate a practice exam in JSON format with the following structure:
+- exam.id, exam.title, exam.durationMinutes, exam.totalQuestions
+- Multiple sections with questions
+- Each question has: id, type ("single_choice" or "multiple_choice"), prompt, 4 choices (A-D), answer, and explanation
+- For single_choice questions: use "choiceId" with one answer (e.g., "A")
+- For multiple_choice questions: use "choiceIds" with multiple answers (e.g., ["A","C"])
+- Make it about <strong>[YOUR TOPIC HERE]</strong> with <strong>10</strong> questions
+
+Follow this exact JSON structure:
+{"exam":{"id":"exam-id","title":"Exam Title","durationMinutes":45,"totalQuestions":10,"sections":[{"id":"A","title":"Section Name","questions":[{"id":1,"type":"single_choice","prompt":"Question?","choices":[{"id":"A","text":"Option 1"},{"id":"B","text":"Option 2"},{"id":"C","text":"Option 3"},{"id":"D","text":"Option 4"}],"answer":{"choiceId":"A"},"explanation":"Explanation."},{"id":2,"type":"multiple_choice","prompt":"Select all that apply?","choices":[{"id":"A","text":"Option 1"},{"id":"B","text":"Option 2"},{"id":"C","text":"Option 3"},{"id":"D","text":"Option 4"}],"answer":{"choiceIds":["A","C"]},"explanation":"Explanation."}]}]}}</span>
+                    </div>
+                    <button class="copy-btn" onclick="copyPrompt()" id="copyBtn">Copy</button>
+                </div>
+                <p><strong>Paste the generated JSON here:</strong></p>
+                <div class="json-input-container">
+                    <textarea class="json-input" id="jsonInput" placeholder="Paste your exam JSON here..."></textarea>
+                    <button class="paste-btn" onclick="pasteFromClipboard()" id="pasteBtn">Paste</button>
+                </div>
+                <div class="button-group">
+                    <button class="generate-btn" onclick="generateExam()" id="generateBtn">Generate Exam</button>
+                    <button class="load-btn" onclick="loadFromJSON()" id="loadBtn">Load & Start Exam</button>
+                </div>
+                <div class="error-message" id="errorMessage"></div>
+                <div class="success-message" id="successMessage">Exam loaded successfully! Starting...</div>
+            </div>
+            
+            <div class="info-box">
+                <div class="info-box-header" onclick="toggleSettingsBox()">
+                    <h3>⚙️ Azure OpenAI Model Settings</h3>
+                    <span class="toggle-icon" id="settingsToggleIcon">▶</span>
+                </div>
+                <div class="info-box-content" id="settingsBoxContent">
+                    <p style="color: #555; margin-bottom: 20px;">Connect to your Azure OpenAI deployment to generate exams automatically:</p>
+                    
+                    <label for="azureEndpoint" style="display: block; font-weight: 600; margin-bottom: 5px; color: #374151;">Azure OpenAI Endpoint URL:</label>
+                    <input type="text" class="settings-input" id="azureEndpoint" placeholder="https://your-resource.openai.azure.com/" oninput="saveAzureSettings(); checkModelSettings();">
+                    
+                    <label for="deploymentName" style="display: block; font-weight: 600; margin-bottom: 5px; color: #374151;">Deployment Name:</label>
+                    <input type="text" class="settings-input" id="deploymentName" placeholder="gpt-4, gpt-35-turbo, etc." oninput="saveAzureSettings(); checkModelSettings();">
+                    
+                    <div style="border-top: 1px solid #d1d5db; margin: 20px 0; padding-top: 20px;">
+                        <p style="color: #374151; font-weight: 600; margin-bottom: 10px;">Authentication Method:</p>
+                        <div class="auth-type-selector">
+                            <label>
+                                <input type="radio" name="authType" value="apikey" checked onchange="toggleAuthFields()">
+                                API Key
+                            </label>
+                            <label>
+                                <input type="radio" name="authType" value="token" onchange="toggleAuthFields()">
+                                Access Token
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div id="apiKeySection">
+                        <label for="apiKey" style="display: block; font-weight: 600; margin-bottom: 5px; color: #374151;">API Key:</label>
+                        <input type="password" class="settings-input" id="apiKey" placeholder="Your Azure OpenAI API Key" oninput="checkModelSettings()">
+                    </div>
+                    
+                    <div id="accessTokenSection" style="display: none;">
+                        <label for="accessToken" style="display: block; font-weight: 600; margin-bottom: 5px; color: #374151;">Access Token:</label>
+                        <textarea class="settings-input" id="accessToken" placeholder="Paste your Azure access token here" rows="4" oninput="checkModelSettings()"></textarea>
+                        
+                        <div class="info-note">
+                            <strong>📋 How to generate an access token:</strong><br>
+                            Run this command in Azure CLI or Cloud Shell:
+                            <div class="code-snippet">az account get-access-token --resource https://cognitiveservices.azure.com</div>
+                            Copy the <code>"accessToken"</code> value from the JSON response.<br>
+                            <strong>Note:</strong> Tokens expire after ~1 hour and must be regenerated.
+                        </div>
+                    </div>
+                    
+                    <label for="apiVersion" style="display: block; font-weight: 600; margin-bottom: 5px; color: #374151;">API Version:</label>
+                    <input type="text" class="settings-input" id="apiVersion" placeholder="2024-08-01-preview" value="2024-08-01-preview" oninput="checkModelSettings()">
+                    
+                    <p style="color: #dc2626; font-size: 0.9em; margin-top: 10px;">⚠️ Credentials are not saved. You'll need to re-enter them each session.</p>
+                    <p style="color: #10b981; font-size: 0.9em; margin-top: 5px;">✓ Endpoint URL and Deployment Name are saved automatically.</p>
+                </div>
+            </div>
+            
+            <div class="info-box" id="historyBox" style="display: none;">
+                <div class="info-box-header" onclick="toggleHistoryBox()">
+                    <h3>📊 Recent Exam History</h3>
+                    <span class="toggle-icon" id="historyToggleIcon">▼</span>
+                </div>
+                <div class="info-box-content" id="historyBoxContent">
+                    <button class="clear-history-btn" onclick="clearHistory()">Clear All History</button>
+                    <div class="history-list" id="historyList"></div>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <div class="info-box-header" onclick="toggleInfoBox()">
+                    <h3>📝 JSON Template Reference</h3>
+                    <span class="toggle-icon" id="toggleIcon">▼</span>
+                </div>
+                <div class="info-box-content" id="infoBoxContent">
+                    <p>Use this template structure when creating exam JSON data:</p>
+                    <ul style="line-height: 1.8; color: #555;">
+                        <li>Each exam has an <strong>id</strong>, <strong>title</strong>, <strong>durationMinutes</strong>, and <strong>totalQuestions</strong></li>
+                        <li>Organize questions into <strong>sections</strong> with a title</li>
+                        <li>Each question includes <strong>prompt</strong>, <strong>choices</strong> (A-D), <strong>answer</strong>, and <strong>explanation</strong></li>
+                        <li>Questions are automatically randomized when you start</li>
+                    </ul>
+                    <a href="TEMPLATE.json" target="_blank" class="template-link">📄 View Complete JSON Template</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quiz Screen -->
+        <div id="quizScreen" class="quiz-container">
+            <div class="question-header">
+                <div>
+                    <span class="question-counter" id="questionCounter"></span>
+                    <span class="question-section" id="questionSection"></span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <span class="timer" id="timer">00:00</span>
+                    <button class="btn-reset" onclick="resetExam()">End Exam</button>
+                </div>
+            </div>
+
+            <div class="copilot-link" id="copilotLink">
+                <a href="#" id="copilotLinkAnchor" target="_blank">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M7.5 0a7.5 7.5 0 0 0-2.372 14.618c.375.069.512-.163.512-.361 0-.178-.006-.65-.01-1.276-2.086.453-2.526-1.006-2.526-1.006-.341-.866-.834-1.097-.834-1.097-.682-.466.052-.456.052-.456.754.053 1.151.774 1.151.774.67 1.148 1.757.817 2.185.625.068-.485.262-.817.476-1.005-1.668-.19-3.421-.834-3.421-3.712 0-.82.292-1.49.774-2.016-.078-.19-.335-.955.073-1.99 0 0 .631-.202 2.067.77a7.196 7.196 0 0 1 1.882-.253c.638.003 1.282.086 1.882.253 1.435-.972 2.065-.77 2.065-.77.409 1.035.152 1.8.074 1.99.482.526.773 1.196.773 2.016 0 2.886-1.757 3.52-3.43 3.705.27.233.51.692.51 1.394 0 1.006-.009 1.817-.009 2.065 0 .2.135.433.516.36A7.5 7.5 0 0 0 7.5 0z"/>
+                    </svg>
+                    Learn more with Copilot
+                </a>
+            </div>
+
+            <div class="question-card">
+                <div class="question-prompt" id="questionPrompt"></div>
+                <div class="question-hint" id="questionHint" style="display: none;"></div>
+                <div class="choices" id="choices"></div>
+                
+                <div class="feedback" id="feedback"></div>
+
+                <div class="button-group">
+                    <button class="btn btn-primary" id="checkBtn" onclick="checkAnswer()" disabled>Check Answer</button>
+                    <button class="btn btn-secondary" id="nextBtn" onclick="nextQuestion()" style="display: none;">Next Question</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="resultsScreen" class="results-container">
+            <h1>Exam Complete!</h1>
+            <div class="score-display" id="scoreDisplay"></div>
+            <div class="score-details" id="scoreDetails"></div>
+            
+            <!-- Study Prompt Generator -->
+            <div id="studyPromptSection" style="display: none; margin: 30px 0; text-align: center;">
+                <button class="start-btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);" onclick="generateStudyPrompt()">📚 Generate Study Prompt</button>
+                <div id="studyPromptDisplay" style="display: none; margin-top: 20px;">
+                    <textarea id="studyPromptText" readonly style="width: 100%; max-width: 800px; height: 120px; padding: 15px; border: 2px solid #10b981; border-radius: 8px; font-family: 'Segoe UI', sans-serif; font-size: 0.95em; resize: vertical; background: #f0fdf4;"></textarea>
+                    <button class="copy-btn" onclick="copyStudyPrompt()" id="copyStudyBtn" style="margin-top: 10px;">Copy to Clipboard</button>
+                </div>
+            </div>
+            
+            <div class="review-section" id="reviewSection"></div>
+            <button class="start-btn" onclick="restartExam()">Take Another Exam</button>
+        </div>
+    </div>
+
+    <script>
+        let availableExams = [];
+        let selectedExamFile = null;
+        let currentExam = null;
+        let currentQuestionIndex = 0;
+        let userAnswers = [];
+        let score = 0;
+        let timerInterval = null;
+        let remainingSeconds = 0;
+        let shuffledQuestions = [];
+
+        // Shuffle array helper function
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        // Exam history functions
+        function saveExamToHistory(examTitle, totalQuestions, score, percentage) {
+            const history = JSON.parse(localStorage.getItem('examHistory') || '[]');
+            
+            const examRecord = {
+                title: examTitle,
+                date: new Date().toISOString(),
+                totalQuestions: totalQuestions,
+                score: score,
+                percentage: percentage,
+                examData: currentExam  // Save full exam data for retaking
+            };
+            
+            // Add to beginning of array and keep only last 10
+            history.unshift(examRecord);
+            if (history.length > 10) {
+                history.pop();
+            }
+            
+            localStorage.setItem('examHistory', JSON.stringify(history));
+            displayHistory();
+        }
+
+        function displayHistory() {
+            const history = JSON.parse(localStorage.getItem('examHistory') || '[]');
+            const historyBox = document.getElementById('historyBox');
+            const historyList = document.getElementById('historyList');
+            
+            if (history.length === 0) {
+                historyBox.style.display = 'none';
+                return;
+            }
+            
+            historyBox.style.display = 'block';
+            historyList.innerHTML = '';
+            
+            history.forEach((exam, index) => {
+                const date = new Date(exam.date);
+                const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                
+                const item = document.createElement('div');
+                item.className = 'history-item';
+                item.innerHTML = `
+                    <div class="history-item-info">
+                        <div class="history-item-title">${exam.title}</div>
+                        <div class="history-item-details">${formattedDate} • ${exam.score}/${exam.totalQuestions} correct</div>
+                        <div class="json-actions">
+                            <button class="json-btn" onclick="viewJSON(${index})">View JSON</button>
+                            <button class="json-btn" onclick="saveJSON(${index})">Save JSON</button>
+                            <button class="delete-btn" onclick="deleteExam(${index})">Delete</button>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center;">
+                        <div class="history-item-score">${exam.percentage}%</div>
+                        <button class="retake-btn" onclick="retakeExam(${index})">Retake</button>
+                    </div>
+                `;
+                historyList.appendChild(item);
+            });
+        }
+
+        function clearHistory() {
+            if (confirm('Are you sure you want to clear your exam history?')) {
+                localStorage.removeItem('examHistory');
+                displayHistory();
+            }
+        }
+
+        function retakeExam(index) {
+            const history = JSON.parse(localStorage.getItem('examHistory') || '[]');
+            const examRecord = history[index];
+            
+            if (!examRecord || !examRecord.examData) {
+                alert('Unable to retake this exam. The exam data is not available.');
+                return;
+            }
+            
+            // Load the exam data
+            currentExam = examRecord.examData;
+            currentQuestionIndex = 0;
+            userAnswers = [];
+            score = 0;
+            
+            // Collect all questions and shuffle them
+            const allQuestions = [];
+            currentExam.sections.forEach(section => {
+                section.questions.forEach(q => {
+                    allQuestions.push({ ...q, sectionTitle: section.title });
+                });
+            });
+            shuffledQuestions = shuffleArray(allQuestions);
+            
+            // Initialize timer
+            remainingSeconds = (currentExam.durationMinutes || 45) * 60;
+            startTimer();
+            
+            // Hide selection screen, show quiz screen
+            document.getElementById('selectionScreen').style.display = 'none';
+            document.getElementById('quizScreen').classList.add('active');
+            
+            displayQuestion();
+        }
+
+        function viewJSON(index) {
+            const history = JSON.parse(localStorage.getItem('examHistory') || '[]');
+            const examRecord = history[index];
+            
+            if (!examRecord || !examRecord.examData) {
+                alert('Exam data is not available.');
+                return;
+            }
+            
+            // Create full exam structure
+            const fullExam = { exam: examRecord.examData };
+            const jsonString = JSON.stringify(fullExam, null, 2);
+            
+            // Open in new window
+            const newWindow = window.open('', '_blank');
+            newWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>${examRecord.title} - JSON</title>
+                    <style>
+                        body {
+                            font-family: 'Courier New', monospace;
+                            padding: 20px;
+                            background: #1e1e1e;
+                            color: #d4d4d4;
+                        }
+                        pre {
+                            white-space: pre-wrap;
+                            word-wrap: break-word;
+                        }
+                        .header {
+                            background: #252526;
+                            padding: 15px;
+                            border-radius: 5px;
+                            margin-bottom: 20px;
+                            color: #fff;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h2>${examRecord.title}</h2>
+                        <p>Exam JSON Data</p>
+                    </div>
+                    <pre>${jsonString}</pre>
+                </body>
+                </html>
+            `);
+            newWindow.document.close();
+        }
+
+        function saveJSON(index) {
+            const history = JSON.parse(localStorage.getItem('examHistory') || '[]');
+            const examRecord = history[index];
+            
+            if (!examRecord || !examRecord.examData) {
+                alert('Exam data is not available.');
+                return;
+            }
+            
+            // Create full exam structure
+            const fullExam = { exam: examRecord.examData };
+            const jsonString = JSON.stringify(fullExam, null, 2);
+            
+            // Create blob and download
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Generate filename from exam title
+            const filename = examRecord.title.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.json';
+            a.download = filename;
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function deleteExam(index) {
+            if (!confirm('Are you sure you want to delete this exam from history?')) {
+                return;
+            }
+            
+            const history = JSON.parse(localStorage.getItem('examHistory') || '[]');
+            history.splice(index, 1);
+            localStorage.setItem('examHistory', JSON.stringify(history));
+            displayHistory();
+        }
+
+        function displayQuestion() {
+            if (currentQuestionIndex >= shuffledQuestions.length) {
+                showResults();
+                return;
+            }
+
+            const question = shuffledQuestions[currentQuestionIndex];
+            const isMultipleChoice = question.answer.choiceIds !== undefined;
+            
+            // Update header
+            document.getElementById('questionCounter').textContent = 
+                `Question ${currentQuestionIndex + 1} of ${shuffledQuestions.length}`;
+            document.getElementById('questionSection').textContent = 
+                `Section: ${question.sectionTitle}`;
+            
+            // Update question prompt
+            const questionPromptDiv = document.getElementById('questionPrompt');
+            questionPromptDiv.textContent = question.prompt;
+            
+            // Add hint for multiple choice questions
+            const hintElement = document.getElementById('questionHint');
+            if (isMultipleChoice) {
+                const correctCount = question.answer.choiceIds.length;
+                hintElement.textContent = `Select all that apply (${correctCount} correct answer${correctCount > 1 ? 's' : ''})`;
+                hintElement.style.display = 'block';
+            } else {
+                hintElement.style.display = 'none';
+            }
+            
+            // Update Copilot link for current question
+            const searchQuery = encodeURIComponent(question.prompt);
+            document.getElementById('copilotLinkAnchor').href = 
+                `https://copilot.microsoft.com/?q=${searchQuery}`;
+            
+            // Randomize the order of choices
+            const shuffledChoices = [...question.choices].sort(() => Math.random() - 0.5);
+            
+            // Display choices with numbers instead of letters
+            const choicesContainer = document.getElementById('choices');
+            choicesContainer.innerHTML = '';
+            
+            shuffledChoices.forEach((choice, index) => {
+                const choiceDiv = document.createElement('div');
+                choiceDiv.className = isMultipleChoice ? 'choice multi-select' : 'choice';
+                choiceDiv.onclick = () => selectChoice(choice.id, isMultipleChoice);
+                choiceDiv.dataset.choiceId = choice.id;
+                
+                if (isMultipleChoice) {
+                    choiceDiv.innerHTML = `
+                        <div class="choice-checkbox"></div>
+                        <span class="choice-label">${index + 1}.</span>
+                        <span>${choice.text}</span>
+                    `;
+                } else {
+                    choiceDiv.innerHTML = `<span class="choice-label">${index + 1}.</span>${choice.text}`;
+                }
+                choicesContainer.appendChild(choiceDiv);
+            });
+            
+            // Reset UI
+            const feedback = document.getElementById('feedback');
+            feedback.className = 'feedback placeholder';
+            feedback.innerHTML = isMultipleChoice 
+                ? 'Select all correct answers and check to see the result, or skip to the next question.'
+                : 'Select an answer and check to see the result, or skip to the next question.';
+            document.getElementById('checkBtn').style.display = 'block';
+            document.getElementById('checkBtn').disabled = true;
+            document.getElementById('nextBtn').style.display = 'block';
+            document.getElementById('nextBtn').disabled = true;
+        }
+
+        function selectChoice(choiceId, isMultipleChoice = false) {
+            const selectedChoice = document.querySelector(`[data-choice-id="${choiceId}"]`);
+            
+            if (isMultipleChoice) {
+                // Toggle selection for multiple choice
+                selectedChoice.classList.toggle('selected');
+            } else {
+                // Single choice: remove all selections first
+                document.querySelectorAll('.choice').forEach(choice => {
+                    choice.classList.remove('selected');
+                });
+                selectedChoice.classList.add('selected');
+            }
+            
+            // Enable buttons if at least one choice is selected
+            const hasSelection = document.querySelector('.choice.selected') !== null;
+            document.getElementById('checkBtn').disabled = !hasSelection;
+            document.getElementById('nextBtn').disabled = !hasSelection;
+        }
+
+        function checkAnswer() {
+            const question = shuffledQuestions[currentQuestionIndex];
+            const selectedChoices = document.querySelectorAll('.choice.selected');
+            
+            if (selectedChoices.length === 0) return;
+            
+            const isMultipleChoice = question.answer.choiceIds !== undefined;
+            let isCorrect = false;
+            let userChoiceIds = [];
+            let correctChoiceIds = [];
+            
+            if (isMultipleChoice) {
+                // Get user selections
+                userChoiceIds = Array.from(selectedChoices).map(choice => choice.dataset.choiceId);
+                correctChoiceIds = question.answer.choiceIds;
+                
+                // Check if arrays match exactly (same items, regardless of order)
+                isCorrect = userChoiceIds.length === correctChoiceIds.length &&
+                           userChoiceIds.every(id => correctChoiceIds.includes(id));
+            } else {
+                const userChoiceId = selectedChoices[0].dataset.choiceId;
+                const correctChoiceId = question.answer.choiceId;
+                userChoiceIds = [userChoiceId];
+                correctChoiceIds = [correctChoiceId];
+                isCorrect = userChoiceId === correctChoiceId;
+            }
+            
+            if (isCorrect) score++;
+            
+            userAnswers.push({
+                questionId: question.id,
+                userChoices: userChoiceIds,
+                correctChoices: correctChoiceIds,
+                isCorrect: isCorrect
+            });
+            
+            // Disable all choices
+            document.querySelectorAll('.choice').forEach(choice => {
+                choice.classList.add('disabled');
+                choice.onclick = null;
+            });
+            
+            // Highlight answers
+            if (isMultipleChoice) {
+                // For multiple choice, show which selections were correct/incorrect
+                selectedChoices.forEach(choice => {
+                    const choiceId = choice.dataset.choiceId;
+                    if (correctChoiceIds.includes(choiceId)) {
+                        choice.classList.add('correct');
+                    } else {
+                        choice.classList.add('incorrect');
+                    }
+                });
+                
+                // Also highlight correct answers that weren't selected
+                correctChoiceIds.forEach(correctId => {
+                    const correctChoice = document.querySelector(`[data-choice-id="${correctId}"]`);
+                    if (correctChoice && !correctChoice.classList.contains('selected')) {
+                        correctChoice.classList.add('correct');
+                    }
+                });
+            } else {
+                // Single choice: highlight selected and correct
+                selectedChoices[0].classList.add(isCorrect ? 'correct' : 'incorrect');
+                if (!isCorrect) {
+                    document.querySelector(`[data-choice-id="${correctChoiceIds[0]}"]`).classList.add('correct');
+                }
+            }
+            
+            // Show feedback
+            const feedback = document.getElementById('feedback');
+            feedback.className = 'feedback ' + (isCorrect ? 'correct' : 'incorrect');
+            
+            if (isCorrect) {
+                const explanation = question.explanation ? `<br><br>${question.explanation}` : '';
+                feedback.innerHTML = `<strong>✓ Correct!</strong> Well done.${explanation}`;
+            } else {
+                if (isMultipleChoice) {
+                    const correctAnswers = question.choices
+                        .filter(c => correctChoiceIds.includes(c.id))
+                        .map(c => c.text);
+                    const answersHTML = correctAnswers.map(text => `• ${text}`).join('<br>');
+                    const explanation = question.explanation ? `<br><br><em>${question.explanation}</em>` : '';
+                    feedback.innerHTML = `<strong>✗ Incorrect.</strong> The correct answers are:<br><br>${answersHTML}${explanation}`;
+                } else {
+                    const correctAnswer = question.choices.find(c => c.id === correctChoiceIds[0]);
+                    const explanation = question.explanation ? `<br><br><em>${question.explanation}</em>` : '';
+                    feedback.innerHTML = `<strong>✗ Incorrect.</strong> The correct answer is:<br><br><strong>${correctAnswer.text}</strong>${explanation}`;
+                }
+            }
+            
+            // Update Copilot link with current question
+            const searchQuery = encodeURIComponent(question.prompt);
+            document.getElementById('copilotLinkAnchor').href = 
+                `https://copilot.microsoft.com/?q=${searchQuery}`;
+            
+            // Disable check button after checking, keep next enabled
+            document.getElementById('checkBtn').disabled = true;
+            document.getElementById('nextBtn').disabled = false;
+        }
+
+        function nextQuestion() {
+            const selectedChoices = document.querySelectorAll('.choice.selected');
+            
+            // If answer was selected but not checked, record it
+            if (selectedChoices.length > 0 && !document.getElementById('checkBtn').disabled) {
+                const question = shuffledQuestions[currentQuestionIndex];
+                const isMultipleChoice = question.answer.choiceIds !== undefined;
+                
+                let userChoiceIds = Array.from(selectedChoices).map(choice => choice.dataset.choiceId);
+                let correctChoiceIds = isMultipleChoice ? question.answer.choiceIds : [question.answer.choiceId];
+                
+                let isCorrect = false;
+                if (isMultipleChoice) {
+                    isCorrect = userChoiceIds.length === correctChoiceIds.length &&
+                               userChoiceIds.every(id => correctChoiceIds.includes(id));
+                } else {
+                    isCorrect = userChoiceIds[0] === correctChoiceIds[0];
+                }
+                
+                if (isCorrect) score++;
+                
+                userAnswers.push({
+                    questionId: question.id,
+                    userChoices: userChoiceIds,
+                    correctChoices: correctChoiceIds,
+                    isCorrect: isCorrect,
+                    skipped: true
+                });
+            }
+            
+            currentQuestionIndex++;
+            displayQuestion();
+        }
+
+        function showResults() {
+            const totalQuestions = shuffledQuestions.length;
+            const percentage = Math.round((score / totalQuestions) * 100);
+            
+            // Save to history
+            const examTitle = currentExam.title || 'Practice Exam';
+            saveExamToHistory(examTitle, totalQuestions, score, percentage);
+            
+            document.getElementById('quizScreen').classList.remove('active');
+            document.getElementById('resultsScreen').classList.add('active');
+            
+            document.getElementById('scoreDisplay').textContent = `${score} / ${totalQuestions}`;
+            document.getElementById('scoreDetails').textContent = 
+                `You scored ${percentage}% on this exam.`;
+            
+            // Display incorrect questions
+            const reviewSection = document.getElementById('reviewSection');
+            const incorrectAnswers = userAnswers.filter(answer => !answer.isCorrect);
+            
+            // Show/hide study prompt button based on incorrect answers
+            const studyPromptSection = document.getElementById('studyPromptSection');
+            if (incorrectAnswers.length > 0) {
+                studyPromptSection.style.display = 'block';
+                // Hide the prompt display initially when showing results
+                document.getElementById('studyPromptDisplay').style.display = 'none';
+            } else {
+                studyPromptSection.style.display = 'none';
+            }
+            
+            if (incorrectAnswers.length > 0) {
+                let reviewHTML = '<h2>📝 Questions to Review (' + incorrectAnswers.length + ' incorrect)</h2>';
+                reviewHTML += '<div class="review-list">';
+                
+                incorrectAnswers.forEach((answer, index) => {
+                    const question = shuffledQuestions.find(q => q.id === answer.questionId);
+                    const isMultipleChoice = answer.userChoices.length > 1 || answer.correctChoices.length > 1;
+                    
+                    let yourAnswerHTML = '';
+                    if (isMultipleChoice) {
+                        const yourAnswers = question.choices.filter(c => answer.userChoices.includes(c.id));
+                        yourAnswerHTML = yourAnswers.length > 0 
+                            ? yourAnswers.map(a => `• ${a.text}`).join('<br>')
+                            : 'Not answered';
+                    } else {
+                        const yourAnswer = question.choices.find(c => c.id === answer.userChoices[0]);
+                        yourAnswerHTML = yourAnswer ? yourAnswer.text : 'Not answered';
+                    }
+                    
+                    let correctAnswerHTML = '';
+                    if (isMultipleChoice) {
+                        const correctAnswers = question.choices.filter(c => answer.correctChoices.includes(c.id));
+                        correctAnswerHTML = correctAnswers.map(a => `• ${a.text}`).join('<br>');
+                    } else {
+                        const correctAnswer = question.choices.find(c => c.id === answer.correctChoices[0]);
+                        correctAnswerHTML = correctAnswer ? correctAnswer.text : '';
+                    }
+                    
+                    reviewHTML += `
+                        <div class="review-item">
+                            <div class="review-question-number">Question ${answer.questionId} - ${question.sectionTitle || ''}</div>
+                            <div class="review-question-text">${question.prompt}</div>
+                            <div class="review-answer review-your-answer">
+                                <span class="review-answer-label">Your Answer:</span><br>
+                                ${yourAnswerHTML}
+                            </div>
+                            <div class="review-answer review-correct-answer">
+                                <span class="review-answer-label">Correct Answer:</span><br>
+                                ${correctAnswerHTML}
+                            </div>
+                            ${question.explanation ? `
+                                <div class="review-explanation">
+                                    <div class="review-explanation-label">Explanation:</div>
+                                    ${question.explanation}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                
+                reviewHTML += '</div>';
+                reviewSection.innerHTML = reviewHTML;
+            } else {
+                reviewSection.innerHTML = '<h2>🎉 Perfect Score! All answers were correct!</h2>';
+            }
+        }
+
+        function restartExam() {
+            document.getElementById('resultsScreen').classList.remove('active');
+            document.getElementById('selectionScreen').style.display = 'block';
+            
+            // Reset selection
+            document.querySelectorAll('.exam-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            selectedExamFile = null;
+            document.getElementById('startBtn').disabled = true;
+        }
+
+        function resetExam() {
+            // Stop timer
+            stopTimer();
+            // Show results first
+            showResults();
+        }
+
+        function generateStudyPrompt() {
+            const incorrectAnswers = userAnswers.filter(answer => !answer.isCorrect);
+            
+            // Extract topics from incorrect questions
+            const topics = new Set();
+            incorrectAnswers.forEach(answer => {
+                const question = shuffledQuestions.find(q => q.id === answer.questionId);
+                if (question) {
+                    // Add section title as topic
+                    if (question.sectionTitle) {
+                        topics.add(question.sectionTitle);
+                    }
+                    
+                    // Try to extract topics from the question prompt (simplified approach)
+                    // You could enhance this by adding a 'topic' field to questions in the future
+                    const prompt = question.prompt;
+                    // Add the first sentence or key phrase as a topic
+                    const firstSentence = prompt.split(/[.?!]/)[0].trim();
+                    if (firstSentence.length > 10 && firstSentence.length < 100) {
+                        topics.add(firstSentence);
+                    }
+                }
+            });
+            
+            // Generate the prompt
+            const topicsList = Array.from(topics).join(', ');
+            const studyPrompt = `I need a study guide based on the following topics which I am studying for. Prioritize information and links from Microsoft Learn if possible: ${topicsList}`;
+            
+            // Display the prompt
+            document.getElementById('studyPromptText').value = studyPrompt;
+            document.getElementById('studyPromptDisplay').style.display = 'block';
+        }
+
+        function copyStudyPrompt() {
+            const promptText = document.getElementById('studyPromptText').value;
+            const copyBtn = document.getElementById('copyStudyBtn');
+            
+            navigator.clipboard.writeText(promptText).then(() => {
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✓ Copied!';
+                copyBtn.classList.add('copied');
+                
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy to clipboard. Please select and copy manually.');
+            });
+        }
+
+        function startTimer() {
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                remainingSeconds--;
+                updateTimerDisplay();
+                
+                if (remainingSeconds <= 0) {
+                    stopTimer();
+                    // Auto-end exam when time runs out
+                    showResults();
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            const timeString = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            
+            const timerElement = document.getElementById('timer');
+            timerElement.textContent = timeString;
+            
+            // Change color based on remaining time
+            timerElement.classList.remove('warning', 'critical');
+            if (remainingSeconds <= 60) {
+                timerElement.classList.add('critical');
+            } else if (remainingSeconds <= 300) {
+                timerElement.classList.add('warning');
+            }
+        }
+
+        function toggleInfoBox() {
+            const content = document.getElementById('infoBoxContent');
+            const icon = document.getElementById('toggleIcon');
+            
+            content.classList.toggle('expanded');
+            icon.classList.toggle('expanded');
+        }
+
+        function toggleHistoryBox() {
+            const content = document.getElementById('historyBoxContent');
+            const icon = document.getElementById('historyToggleIcon');
+            
+            content.classList.toggle('expanded');
+            icon.classList.toggle('expanded');
+        }
+
+        function toggleSettingsBox() {
+            const content = document.getElementById('settingsBoxContent');
+            const icon = document.getElementById('settingsToggleIcon');
+            
+            content.classList.toggle('expanded');
+            icon.classList.toggle('expanded');
+        }
+
+        function toggleAuthFields() {
+            const authType = document.querySelector('input[name="authType"]:checked').value;
+            const apiKeySection = document.getElementById('apiKeySection');
+            const accessTokenSection = document.getElementById('accessTokenSection');
+            
+            if (authType === 'apikey') {
+                apiKeySection.style.display = 'block';
+                accessTokenSection.style.display = 'none';
+            } else {
+                apiKeySection.style.display = 'none';
+                accessTokenSection.style.display = 'block';
+            }
+            
+            checkModelSettings();
+        }
+
+        function copyPrompt() {
+            const promptText = document.getElementById('promptText').textContent;
+            navigator.clipboard.writeText(promptText).then(() => {
+                const btn = document.getElementById('copyBtn');
+                btn.textContent = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = 'Copy';
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        }
+
+        function pasteFromClipboard() {
+            navigator.clipboard.readText().then(text => {
+                document.getElementById('jsonInput').value = text;
+                const btn = document.getElementById('pasteBtn');
+                btn.textContent = 'Pasted!';
+                btn.classList.add('pasted');
+                setTimeout(() => {
+                    btn.textContent = 'Paste';
+                    btn.classList.remove('pasted');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to paste:', err);
+                alert('Failed to paste from clipboard. Please use Ctrl+V manually.');
+            });
+        }
+
+        function checkModelSettings() {
+            const endpoint = document.getElementById('azureEndpoint').value.trim();
+            const deployment = document.getElementById('deploymentName').value.trim();
+            const apiVersion = document.getElementById('apiVersion').value.trim();
+            const authType = document.querySelector('input[name="authType"]:checked').value;
+            
+            let hasAuth = false;
+            if (authType === 'apikey') {
+                const apiKey = document.getElementById('apiKey').value.trim();
+                hasAuth = apiKey.length > 0;
+            } else {
+                const accessToken = document.getElementById('accessToken').value.trim();
+                hasAuth = accessToken.length > 0;
+            }
+            
+            const generateBtn = document.getElementById('generateBtn');
+            if (endpoint && deployment && apiVersion && hasAuth) {
+                generateBtn.classList.add('active');
+            } else {
+                generateBtn.classList.remove('active');
+            }
+        }
+
+        async function generateExam() {
+            const endpoint = document.getElementById('azureEndpoint').value.trim();
+            const deployment = document.getElementById('deploymentName').value.trim();
+            const apiVersion = document.getElementById('apiVersion').value.trim();
+            const authType = document.querySelector('input[name="authType"]:checked').value;
+            const topic = document.getElementById('topicInput').value.trim();
+            const questionCount = document.getElementById('questionCountInput').value || '10';
+            
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+            const generateBtn = document.getElementById('generateBtn');
+            
+            // Clear previous messages
+            errorMessage.classList.remove('show');
+            successMessage.classList.remove('show');
+            
+            // Disable button and show loading state
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating...';
+            
+            try {
+                // Get the prompt text from the prompt box (already formatted with topic and question count)
+                const userPrompt = document.getElementById('promptText').textContent;
+                
+                // Remove trailing slash from endpoint if present
+                const cleanEndpoint = endpoint.replace(/\/$/, '');
+                const url = `${cleanEndpoint}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+                
+                // Build headers based on auth type
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                
+                if (authType === 'apikey') {
+                    const apiKey = document.getElementById('apiKey').value.trim();
+                    headers['api-key'] = apiKey;
+                } else {
+                    const accessToken = document.getElementById('accessToken').value.trim();
+                    headers['Authorization'] = `Bearer ${accessToken}`;
+                }
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({
+                        messages: [
+                            {
+                                role: 'system',
+                                content: 'You are an exam generator that creates practice exams in JSON format. Always respond with valid JSON only, no additional text.'
+                            },
+                            {
+                                role: 'user',
+                                content: userPrompt
+                            }
+                        ],
+                        response_format: { type: 'json_object' },
+                        temperature: 0.7,
+                        max_tokens: 4000
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(`API Error: ${response.status} - ${errorData.error?.message || response.statusText}`);
+                }
+                
+                const data = await response.json();
+                const generatedContent = data.choices[0].message.content;
+                
+                // Populate the JSON textarea
+                document.getElementById('jsonInput').value = generatedContent;
+                
+                successMessage.textContent = 'Exam generated successfully! Review and click "Load & Start Exam" to begin.';
+                successMessage.classList.add('show');
+                
+            } catch (error) {
+                console.error('Error generating exam:', error);
+                errorMessage.textContent = 'Error: ' + error.message;
+                errorMessage.classList.add('show');
+            } finally {
+                // Re-enable button
+                generateBtn.disabled = false;
+                generateBtn.textContent = 'Generate Exam';
+            }
+        }
+
+        function updatePrompt() {
+            const topic = document.getElementById('topicInput').value.trim();
+            const questionCount = document.getElementById('questionCountInput').value || '10';
+            const promptText = document.getElementById('promptText');
+            
+            const basePrompt = `Generate a practice exam in JSON format with the following structure:
+- exam.id, exam.title, exam.durationMinutes, exam.totalQuestions
+- Multiple sections with questions
+- Each question has: id, type ("single_choice" or "multiple_choice"), prompt, 4 choices (A-D), answer, and explanation
+- For single_choice questions: use "choiceId" with one answer (e.g., "A")
+- For multiple_choice questions: use "choiceIds" with multiple answers (e.g., ["A","C"])
+- Make it about ${topic || '<strong>[YOUR TOPIC HERE]</strong>'} with <strong>${questionCount}</strong> questions
+
+Follow this exact JSON structure:
+{"exam":{"id":"exam-id","title":"Exam Title","durationMinutes":45,"totalQuestions":${questionCount},"sections":[{"id":"A","title":"Section Name","questions":[{"id":1,"type":"single_choice","prompt":"Question?","choices":[{"id":"A","text":"Option 1"},{"id":"B","text":"Option 2"},{"id":"C","text":"Option 3"},{"id":"D","text":"Option 4"}],"answer":{"choiceId":"A"},"explanation":"Explanation."},{"id":2,"type":"multiple_choice","prompt":"Select all that apply?","choices":[{"id":"A","text":"Option 1"},{"id":"B","text":"Option 2"},{"id":"C","text":"Option 3"},{"id":"D","text":"Option 4"}],"answer":{"choiceIds":["A","C"]},"explanation":"Explanation."}]}]}}`;
+            
+            promptText.innerHTML = basePrompt;
+        }
+
+        function loadFromJSON() {
+            const jsonInput = document.getElementById('jsonInput').value.trim();
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+            
+            // Clear previous messages
+            errorMessage.classList.remove('show');
+            successMessage.classList.remove('show');
+            
+            if (!jsonInput) {
+                errorMessage.textContent = 'Please paste exam JSON data first.';
+                errorMessage.classList.add('show');
+                return;
+            }
+            
+            try {
+                console.log('Attempting to parse JSON...');
+                const examData = JSON.parse(jsonInput);
+                console.log('Parsed exam data:', examData);
+                
+                // Validate basic structure
+                if (!examData.exam) {
+                    throw new Error('Invalid exam structure - missing "exam" property');
+                }
+                
+                if (!examData.exam.sections) {
+                    throw new Error('Invalid exam structure - missing "sections" property');
+                }
+                
+                // Validate sections have questions
+                if (!examData.exam.sections[0] || !examData.exam.sections[0].questions || examData.exam.sections[0].questions.length === 0) {
+                    throw new Error('Invalid exam structure - sections must contain questions');
+                }
+                
+                console.log('Validation passed, starting exam...');
+                
+                // Show success message briefly
+                successMessage.classList.add('show');
+                
+                // Create a temporary exam entry
+                currentExam = examData.exam;
+                currentQuestionIndex = 0;
+                userAnswers = [];
+                score = 0;
+                
+                // Collect all questions and shuffle them
+                const allQuestions = [];
+                currentExam.sections.forEach(section => {
+                    section.questions.forEach(q => {
+                        allQuestions.push({ ...q, sectionTitle: section.title });
+                    });
+                });
+                shuffledQuestions = shuffleArray(allQuestions);
+                
+                // Initialize timer
+                remainingSeconds = (currentExam.durationMinutes || 45) * 60;
+                startTimer();
+                
+                // Small delay to show success message
+                setTimeout(() => {
+                    // Reset form elements
+                    document.getElementById('jsonInput').value = '';
+                    successMessage.classList.remove('show');
+                    errorMessage.classList.remove('show');
+                    
+                    // Hide selection screen, show quiz screen
+                    document.getElementById('selectionScreen').style.display = 'none';
+                    document.getElementById('quizScreen').classList.add('active');
+                    
+                    displayQuestion();
+                    console.log('Exam started successfully!');
+                }, 500);
+            } catch (error) {
+                console.error('Error loading JSON:', error);
+                errorMessage.textContent = 'Error: ' + error.message + '\n\nPlease check that your JSON is valid and matches the required structure.';
+                errorMessage.classList.add('show');
+            }
+        }
+
+        // Save Azure settings to localStorage
+        function saveAzureSettings() {
+            const endpoint = document.getElementById('azureEndpoint').value.trim();
+            const deployment = document.getElementById('deploymentName').value.trim();
+            
+            localStorage.setItem('azureEndpoint', endpoint);
+            localStorage.setItem('deploymentName', deployment);
+        }
+
+        // Load Azure settings from localStorage
+        function loadAzureSettings() {
+            const savedEndpoint = localStorage.getItem('azureEndpoint');
+            const savedDeployment = localStorage.getItem('deploymentName');
+            
+            if (savedEndpoint) {
+                document.getElementById('azureEndpoint').value = savedEndpoint;
+            }
+            if (savedDeployment) {
+                document.getElementById('deploymentName').value = savedDeployment;
+            }
+            
+            // Trigger validation check after loading
+            checkModelSettings();
+        }
+
+        // Initialize on page load
+        displayHistory();
+        loadAzureSettings();
+    </script>
+</body>
+</html>

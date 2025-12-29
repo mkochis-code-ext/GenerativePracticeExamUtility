@@ -1,0 +1,69 @@
+{
+  "exam": {
+    "id": "your-exam-id",
+    "title": "Your Exam Title",
+    "durationMinutes": 45,
+    "totalQuestions": 10,
+    "instructions": {
+      "mode": "timed",
+      "recommendedSecondsPerQuestion": 60,
+      "scoring": {
+        "pointsPerQuestion": 1,
+        "maxScore": 10
+      }
+    },
+    "sections": [
+      {
+        "id": "A",
+        "title": "Section Name",
+        "questions": [
+          {
+            "id": 1,
+            "type": "multiple_choice",
+            "prompt": "Your question text goes here?",
+            "choices": [
+              { "id": "A", "text": "First answer option" },
+              { "id": "B", "text": "Second answer option" },
+              { "id": "C", "text": "Third answer option" },
+              { "id": "D", "text": "Fourth answer option" }
+            ],
+            "answer": { "choiceId": "A" },
+            "explanation": "Detailed explanation of the correct answer."
+          },
+          {
+            "id": 2,
+            "type": "multiple_choice",
+            "prompt": "Another question example?",
+            "choices": [
+              { "id": "A", "text": "First option" },
+              { "id": "B", "text": "Second option" },
+              { "id": "C", "text": "Third option" },
+              { "id": "D", "text": "Fourth option" }
+            ],
+            "answer": { "choiceId": "B" },
+            "explanation": "Detailed explanation of the correct answer."
+          }
+        ]
+      },
+      {
+        "id": "B",
+        "title": "Another Section",
+        "questions": [
+          {
+            "id": 3,
+            "type": "multiple_choice",
+            "prompt": "Question in second section?",
+            "choices": [
+              { "id": "A", "text": "Answer A" },
+              { "id": "B", "text": "Answer B" },
+              { "id": "C", "text": "Answer C" },
+              { "id": "D", "text": "Answer D" }
+            ],
+            "answer": { "choiceId": "C" },
+            "explanation": "Detailed explanation of the correct answer."
+          }
+        ]
+      }
+    ]
+  }
+}
