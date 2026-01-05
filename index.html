@@ -36,9 +36,10 @@
 - For single_choice questions: use "choiceId" with one answer (e.g., "A")
 - For multiple_choice questions: use "choiceIds" with multiple answers (e.g., ["A","C"])
 - Make it about <strong>[YOUR TOPIC HERE]</strong> with <strong>10</strong> questions
+- Include a url for further learning in each question's "learnMoreUrl" field, Prioritize microsoft learn for microsoft topics.
 
 Follow this exact JSON structure:
-{"exam":{"id":"exam-id","title":"Exam Title","durationMinutes":45,"totalQuestions":10,"sections":[{"id":"A","title":"Section Name","questions":[{"id":1,"type":"single_choice","prompt":"Question?","choices":[{"id":"A","text":"Option 1"},{"id":"B","text":"Option 2"},{"id":"C","text":"Option 3"},{"id":"D","text":"Option 4"}],"answer":{"choiceId":"A"},"explanation":"Explanation."},{"id":2,"type":"multiple_choice","prompt":"Select all that apply?","choices":[{"id":"A","text":"Option 1"},{"id":"B","text":"Option 2"},{"id":"C","text":"Option 3"},{"id":"D","text":"Option 4"}],"answer":{"choiceIds":["A","C"]},"explanation":"Explanation."}]}]}}</span>
+{"exam":{"id":"exam-id","title":"Exam Title","durationMinutes":45,"totalQuestions":10,"sections":[{"id":"A","title":"Section Name","questions":[{"id":1,"type":"single_choice","prompt":"Question?","choices":[{"id":"A","text":"Option 1"},{"id":"B","text":"Option 2"},{"id":"C","text":"Option 3"},{"id":"D","text":"Option 4"}],"answer":{"choiceId":"A"},"explanation":"Explanation.","learnMoreUrl":""},{"id":2,"type":"multiple_choice","prompt":"Select all that apply?","choices":[{"id":"A","text":"Option 1"},{"id":"B","text":"Option 2"},{"id":"C","text":"Option 3"},{"id":"D","text":"Option 4"}],"answer":{"choiceIds":["A","C"]},"explanation":"Explanation.","learnMoreUrl":""}]}]}}</span>
                     </div>
                     <button class="copy-btn" onclick="copyPrompt()" id="copyBtn">Copy</button>
                 </div>
@@ -149,15 +150,6 @@ Follow this exact JSON structure:
                     <span class="timer" id="timer">00:00</span>
                     <button class="btn-reset" onclick="resetExam()">End Exam</button>
                 </div>
-            </div>
-
-            <div class="copilot-link" id="copilotLink">
-                <a href="#" id="copilotLinkAnchor" target="_blank">
-                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M7.5 0a7.5 7.5 0 0 0-2.372 14.618c.375.069.512-.163.512-.361 0-.178-.006-.65-.01-1.276-2.086.453-2.526-1.006-2.526-1.006-.341-.866-.834-1.097-.834-1.097-.682-.466.052-.456.052-.456.754.053 1.151.774 1.151.774.67 1.148 1.757.817 2.185.625.068-.485.262-.817.476-1.005-1.668-.19-3.421-.834-3.421-3.712 0-.82.292-1.49.774-2.016-.078-.19-.335-.955.073-1.99 0 0 .631-.202 2.067.77a7.196 7.196 0 0 1 1.882-.253c.638.003 1.282.086 1.882.253 1.435-.972 2.065-.77 2.065-.77.409 1.035.152 1.8.074 1.99.482.526.773 1.196.773 2.016 0 2.886-1.757 3.52-3.43 3.705.27.233.51.692.51 1.394 0 1.006-.009 1.817-.009 2.065 0 .2.135.433.516.36A7.5 7.5 0 0 0 7.5 0z"/>
-                    </svg>
-                    Learn more with Copilot
-                </a>
             </div>
 
             <div class="question-card">
@@ -439,11 +431,6 @@ Follow this exact JSON structure:
                 hintElement.style.display = 'none';
             }
             
-            // Update Copilot link for current question
-            const searchQuery = encodeURIComponent(question.prompt);
-            document.getElementById('copilotLinkAnchor').href = 
-                `https://copilot.microsoft.com/?q=${searchQuery}`;
-            
             // Randomize the order of choices
             const shuffledChoices = [...question.choices].sort(() => Math.random() - 0.5);
             
@@ -499,6 +486,40 @@ Follow this exact JSON structure:
             const hasSelection = document.querySelector('.choice.selected') !== null;
             document.getElementById('checkBtn').disabled = !hasSelection;
             document.getElementById('nextBtn').disabled = !hasSelection;
+        }
+
+        function copyLearnMorePrompt() {
+            const question = shuffledQuestions[currentQuestionIndex];
+            const userAnswerRecord = userAnswers.find(a => a.questionId === question.id);
+            
+            if (!question || !userAnswerRecord) return;
+
+            const promptText = question.prompt;
+            const choicesText = question.choices.map(c => c.id + ". " + c.text).join(", ");
+            const userSelectedText = question.choices
+                .filter(c => userAnswerRecord.userChoices.includes(c.id))
+                .map(c => c.text)
+                .join(", ");
+            const correctText = question.choices
+                .filter(c => userAnswerRecord.correctChoices.includes(c.id))
+                .map(c => c.text)
+                .join(", ");
+
+            const finalPrompt = `I am taking a practice exam and was given the following question: ${promptText}, I was given the following choices for answers ${choicesText}, and I selected ${userSelectedText}. Please explain further why ${correctText} would be the correct answer(s). Also, provide additional resources where I can learn more about this topic.`;
+
+            navigator.clipboard.writeText(finalPrompt).then(() => {
+                const btn = document.getElementById('btnCopyPrompt');
+                if (btn) {
+                    const originalText = btn.textContent;
+                    btn.textContent = '✓ Copied!';
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                    }, 2000);
+                }
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                alert('Failed to copy to clipboard.');
+            });
         }
 
         function checkAnswer() {
@@ -574,9 +595,21 @@ Follow this exact JSON structure:
             const feedback = document.getElementById('feedback');
             feedback.className = 'feedback ' + (isCorrect ? 'correct' : 'incorrect');
             
+            let buttonsHtml = '<br><br><div style="display: flex; gap: 10px; flex-wrap: wrap;">';
+                        
+            // Learn More URL button
+            if (question.learnMoreUrl) {
+                buttonsHtml += `<a href="${question.learnMoreUrl}" target="_blank" class="btn btn-secondary" style="text-decoration: none; color: white; font-size: 0.9em; padding: 8px 20px;">Learn More</a>`;
+            }
+
+            // Learn More (Prompt) button
+            buttonsHtml += `<button id="btnCopyPrompt" class="btn btn-secondary" onclick="copyLearnMorePrompt()" style="font-size: 0.9em; padding: 8px 20px;">Learn More (Prompt)</button>`;
+            
+            buttonsHtml += '</div>';
+
             if (isCorrect) {
                 const explanation = question.explanation ? `<br><br>${question.explanation}` : '';
-                feedback.innerHTML = `<strong>✓ Correct!</strong> Well done.${explanation}`;
+                feedback.innerHTML = `<strong>✓ Correct!</strong> Well done.${explanation}${buttonsHtml}`;
             } else {
                 if (isMultipleChoice) {
                     const correctAnswers = question.choices
@@ -584,18 +617,13 @@ Follow this exact JSON structure:
                         .map(c => c.text);
                     const answersHTML = correctAnswers.map(text => `• ${text}`).join('<br>');
                     const explanation = question.explanation ? `<br><br><em>${question.explanation}</em>` : '';
-                    feedback.innerHTML = `<strong>✗ Incorrect.</strong> The correct answers are:<br><br>${answersHTML}${explanation}`;
+                    feedback.innerHTML = `<strong>✗ Incorrect.</strong> The correct answers are:<br><br>${answersHTML}${explanation}${buttonsHtml}`;
                 } else {
                     const correctAnswer = question.choices.find(c => c.id === correctChoiceIds[0]);
                     const explanation = question.explanation ? `<br><br><em>${question.explanation}</em>` : '';
-                    feedback.innerHTML = `<strong>✗ Incorrect.</strong> The correct answer is:<br><br><strong>${correctAnswer.text}</strong>${explanation}`;
+                    feedback.innerHTML = `<strong>✗ Incorrect.</strong> The correct answer is:<br><br><strong>${correctAnswer.text}</strong>${explanation}${buttonsHtml}`;
                 }
             }
-            
-            // Update Copilot link with current question
-            const searchQuery = encodeURIComponent(question.prompt);
-            document.getElementById('copilotLinkAnchor').href = 
-                `https://copilot.microsoft.com/?q=${searchQuery}`;
             
             // Disable check button after checking, keep next enabled
             document.getElementById('checkBtn').disabled = true;
@@ -1021,9 +1049,10 @@ Follow this exact JSON structure:
 - For single_choice questions: use "choiceId" with one answer (e.g., "A")
 - For multiple_choice questions: use "choiceIds" with multiple answers (e.g., ["A","C"])
 - Make it about ${topic || '<strong>[YOUR TOPIC HERE]</strong>'} with <strong>${questionCount}</strong> questions
+- Include a url for further learning in each question's "learnMoreUrl" field, Prioritize microsoft learn for microsoft topics.
 
 Follow this exact JSON structure:
-{"exam":{"id":"exam-id","title":"Exam Title","durationMinutes":45,"totalQuestions":${questionCount},"sections":[{"id":"A","title":"Section Name","questions":[{"id":1,"type":"single_choice","prompt":"Question?","choices":[{"id":"A","text":"Option 1"},{"id":"B","text":"Option 2"},{"id":"C","text":"Option 3"},{"id":"D","text":"Option 4"}],"answer":{"choiceId":"A"},"explanation":"Explanation."},{"id":2,"type":"multiple_choice","prompt":"Select all that apply?","choices":[{"id":"A","text":"Option 1"},{"id":"B","text":"Option 2"},{"id":"C","text":"Option 3"},{"id":"D","text":"Option 4"}],"answer":{"choiceIds":["A","C"]},"explanation":"Explanation."}]}]}}`;
+{"exam":{"id":"exam-id","title":"Exam Title","durationMinutes":45,"totalQuestions":${questionCount},"sections":[{"id":"A","title":"Section Name","questions":[{"id":1,"type":"single_choice","prompt":"Question?","choices":[{"id":"A","text":"Option 1"},{"id":"B","text":"Option 2"},{"id":"C","text":"Option 3"},{"id":"D","text":"Option 4"}],"answer":{"choiceId":"A"},"explanation":"Explanation.","learnMoreUrl":""},{"id":2,"type":"multiple_choice","prompt":"Select all that apply?","choices":[{"id":"A","text":"Option 1"},{"id":"B","text":"Option 2"},{"id":"C","text":"Option 3"},{"id":"D","text":"Option 4"}],"answer":{"choiceIds":["A","C"]},"explanation":"Explanation.","learnMoreUrl":""}]}]}}`;
             
             promptText.innerHTML = basePrompt;
         }

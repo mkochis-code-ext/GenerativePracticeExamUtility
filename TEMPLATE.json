@@ -28,7 +28,8 @@
               { "id": "D", "text": "Fourth answer option" }
             ],
             "answer": { "choiceId": "A" },
-            "explanation": "Detailed explanation of the correct answer."
+            "explanation": "Detailed explanation of the correct answer.",
+            "learnMoreUrl":""
           },
           {
             "id": 2,
@@ -41,7 +42,8 @@
               { "id": "D", "text": "Fourth option" }
             ],
             "answer": { "choiceId": "B" },
-            "explanation": "Detailed explanation of the correct answer."
+            "explanation": "Detailed explanation of the correct answer.",
+            "learnMoreUrl":""
           }
         ]
       },
@@ -60,7 +62,8 @@
               { "id": "D", "text": "Answer D" }
             ],
             "answer": { "choiceId": "C" },
-            "explanation": "Detailed explanation of the correct answer."
+            "explanation": "Detailed explanation of the correct answer.",
+            "learnMoreUrl":""
           }
         ]
       }
